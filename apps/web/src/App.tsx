@@ -46,9 +46,30 @@ function App() {
       setUsers((prev) =>
         prev.some((p) => p.id === u.id) ? prev : [...prev, u]
       );
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `sys-join-${u.id}-${Date.now()}`,
+          body: `${u.username} joined the chat`,
+          senderId: "system",
+          username: "system",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
     });
+
     s.on("user_left", (u: { id: string; username: string }) => {
       setUsers((prev) => prev.filter((p) => p.id !== u.id));
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `sys-leave-${u.id}-${Date.now()}`,
+          body: `${u.username} left the chat`,
+          senderId: "system",
+          username: "system",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
     });
 
     s.on(
