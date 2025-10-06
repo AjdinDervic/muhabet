@@ -27,6 +27,21 @@ function App() {
       .catch(() => setStatus("error"));
   }, []);
 
+  // Fetching last 50 messages
+  // Load last 50 messages on first render
+  useEffect(() => {
+    const api =
+      (import.meta.env.VITE_API_URL as string) || "http://localhost:4000";
+    fetch(`${api}/api/messages?limit=50`)
+      .then((r) => r.json())
+      .then((items) => {
+        setMessages(items); // oldest → newest (server already reversed)
+      })
+      .catch(() => {
+        // optional: you could show a toast here
+      });
+  }, []);
+
   // Socket wiring
   useEffect(() => {
     const api =

@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id
+  username  String
+  createdAt DateTime  @default(now())
+  messages  Message[]
+}
+
+model Channel {
+  id        String      @id @default(cuid())
+  kind      ChannelKind
+  createdAt DateTime    @default(now())
+  messages  Message[]
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+
+  sender   User   @relation(fields: [senderId], references: [id])
+  senderId String
+
+  channel   Channel @relation(fields: [channelId], references: [id])
+  channelId String
+
+  @@index([channelId, createdAt])
+}
+
+enum ChannelKind {
+  GLOBAL
+  DM
+}
