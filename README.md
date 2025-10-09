@@ -30,3 +30,10 @@ and displays a global chat feed where everyone can send and receive messages wit
 1. Clone repository  
 2. Navigate to the root of the repository
 3. Run Docker Compose to start the containers: docker-compose up -d
+
+## Deployment
+Backend: https://muhabet.onrender.com
+Frontend: https://muhabet-web.onrender.com
+
+Note:The deployment is still in progress - the interface loads, 
+but some real-time features are currently unstable or not fully connected to the backend.
