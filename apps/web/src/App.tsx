@@ -1,247 +1,136 @@
-import { useEffect, useRef, useState } from "react";
-import { io, Socket } from "socket.io-client";
+import { useEffect, useMemo, useState } from "react";
+import "./App.css";
+import type { Message, User } from "./types";
+import { fetchActiveUsers, fetchMessages } from "./services/api";
+import { useSocket } from "./hooks/useSocket";
+import { ActiveUsers } from "./components/ActiveUsers";
+import { MessageList } from "./components/MessageList";
+import { ChatInput } from "./components/ChatInput";
+import { useMediaQuery } from "./hooks/useMediaQuery";
+import { Welcome } from "./components/Welcome";
 
 function App() {
-  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
-  const [connected, setConnected] = useState(false);
-  const [users, setUsers] = useState<{ id: string; username: string }[]>([]);
-  const [messages, setMessages] = useState<
-    {
-      id: string;
-      body: string;
-      senderId: string;
-      username: string;
-      createdAt: string;
-    }[]
-  >([]);
-  const [text, setText] = useState("");
-  const socketRef = useRef<Socket | null>(null);
+  const [me, setMe] = useState<User | null>(null);
 
-  // API health
+  // Option A: no persistence — always show Welcome on a fresh tab/load
+  const [joined, setJoined] = useState<boolean>(false);
+
+  const [users, setUsers] = useState<Array<{ id: string; username: string }>>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  // layout states
+  const isDesktop = useMediaQuery("(min-width: 921px)");
+  const [desktopCollapsed, setDesktopCollapsed] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // initial data
   useEffect(() => {
-    const api =
-      (import.meta.env.VITE_API_URL as string) || "http://localhost:4000";
-    fetch(`${api}/healthz`)
-      .then((r) => r.json())
-      .then(() => setStatus("ok"))
-      .catch(() => setStatus("error"));
+    fetchActiveUsers().then(setUsers).catch(() => setUsers([]));
+    fetchMessages(50).then(setMessages).catch(() => {});
   }, []);
 
-  // Fetching last 50 messages
-  // Load last 50 messages on first render
+  const { sendMessage } = useSocket({
+    onMessage: (m: Message) => setMessages((prev) => [...prev, m]),
+    onSystem: (sys: Message) => setMessages((prev) => [...prev, sys]),
+    onJoin: (u) =>
+      setUsers((prev) => (prev.some((p) => p.id === u.id) ? prev : [...prev, u])),
+    onLeave: (u) => setUsers((prev) => prev.filter((p) => p.id !== u.id)),
+    onHello: (u) => setMe(u), // random username from server
+  });
+
+  // normalize layout when breakpoint changes
   useEffect(() => {
-    const api =
-      (import.meta.env.VITE_API_URL as string) || "http://localhost:4000";
-    fetch(`${api}/api/messages?limit=50`)
-      .then((r) => r.json())
-      .then((items) => {
-        setMessages(items); // oldest → newest (server already reversed)
-      })
-      .catch(() => {
-        // optional: you could show a toast here
-      });
-  }, []);
-
-  // Socket wiring
-  useEffect(() => {
-    const api =
-      (import.meta.env.VITE_API_URL as string) || "http://localhost:4000";
-    const s = io(api, { transports: ["websocket"] });
-    socketRef.current = s;
-
-    s.on("connect", () => setConnected(true));
-    //alert for notifiation
-    s.on("hello", (payload: { msg: string }) => {
-      console.log("Server says:", payload.msg);
-      alert(payload.msg); // temp: visible proof
-    });
-    s.on("disconnect", () => setConnected(false));
-
-    s.on("user_joined", (u: { id: string; username: string }) => {
-      setUsers((prev) =>
-        prev.some((p) => p.id === u.id) ? prev : [...prev, u]
-      );
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `sys-join-${u.id}-${Date.now()}`,
-          body: `${u.username} joined the chat`,
-          senderId: "system",
-          username: "system",
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    });
-
-    s.on("user_left", (u: { id: string; username: string }) => {
-      setUsers((prev) => prev.filter((p) => p.id !== u.id));
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `sys-leave-${u.id}-${Date.now()}`,
-          body: `${u.username} left the chat`,
-          senderId: "system",
-          username: "system",
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    });
-
-    s.on(
-      "message_created",
-      (msg: {
-        id: string;
-        body: string;
-        senderId: string;
-        username: string;
-        createdAt: string;
-      }) => {
-        setMessages((prev) => [...prev, msg]);
-      }
-    );
-
-    return () => {
-      s.disconnect();
-    };
-  }, []);
-
-  // Prefill active users on load
-  useEffect(() => {
-    const api =
-      (import.meta.env.VITE_API_URL as string) || "http://localhost:4000";
-    fetch(`${api}/api/users/active`)
-      .then((r) => r.json())
-      .then((list) => setUsers(list))
-      .catch(() => setUsers([]));
-  }, []);
-
-  function sendMessage() {
-    const body = text.trim();
-    if (!body) return;
-    socketRef.current?.emit("message:send", { body });
-    setText("");
-  }
-
-  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
+    if (isDesktop) {
+      setSidebarOpen(false);
+      setDesktopCollapsed(false);
+    } else {
+      setSidebarOpen(false);
     }
+  }, [isDesktop]);
+
+  async function loadOlder() {
+    if (!messages.length) return;
+    const oldest = messages[0];
+    const older = await fetchMessages(50, oldest.createdAt);
+    if (older.length) setMessages((prev) => [...older, ...prev]);
   }
 
+  const containerClass = useMemo(() => {
+    if (isDesktop) {
+      return `grid desktop ${desktopCollapsed ? "sidebar-collapsed" : "sidebar-expanded"}`;
+    }
+    return `grid mobile ${sidebarOpen ? "sidebar-open" : ""}`;
+  }, [isDesktop, desktopCollapsed, sidebarOpen]);
+
+  // Gate with Welcome (client-only)
+  if (!joined) {
+    return (
+      <Welcome
+        username={me?.username ?? undefined}
+        onJoin={() => {
+          setJoined(true); // no localStorage/sessionStorage writes
+        }}
+      />
+    );
+  }
+
+  // Chat UI
   return (
-    <div style={{ fontFamily: "system-ui", padding: 16, maxWidth: 640 }}>
-      <h1>Muhabet</h1>
-      <p style={{ marginTop: 4, color: "#555" }}>
-        Friendly conversation — a modern take on the Bosnian “muhabet”.
-      </p>
-
-      <div
-        style={{
-          marginTop: 16,
-          padding: 12,
-          border: "1px solid #ddd",
-          borderRadius: 8,
-        }}
-      >
-        <strong>API status:</strong>{" "}
-        {status === "loading"
-          ? "Checking…"
-          : status === "ok"
-          ? "✅ OK"
-          : "❌ Error"}
-      </div>
-
-      <div
-        style={{
-          marginTop: 8,
-          padding: 12,
-          border: "1px solid #ddd",
-          borderRadius: 8,
-        }}
-      >
-        <strong>Realtime:</strong>{" "}
-        {connected ? "🟢 connected" : "🔴 disconnected"}
-      </div>
-
-      <div
-        style={{
-          marginTop: 8,
-          padding: 12,
-          border: "1px solid #ddd",
-          borderRadius: 8,
-        }}
-      >
-        <strong>Active users:</strong>
-        <ul style={{ marginTop: 8 }}>
-          {users.length === 0 ? (
-            <li>None</li>
+    <div className={containerClass}>
+      <aside className="sidebar card" aria-label="Active users">
+        <div className="sidebar-head">
+          <strong>Active users:</strong>
+          {isDesktop ? (
+            <button
+              className="close-side"
+              onClick={() => setDesktopCollapsed(true)}
+              aria-label="Collapse sidebar"
+            >
+              ×
+            </button>
           ) : (
-            users.map((u) => <li key={u.id}>{u.username}</li>)
-          )}
-        </ul>
-      </div>
-
-      <div
-        style={{
-          marginTop: 8,
-          padding: 12,
-          border: "1px solid #ddd",
-          borderRadius: 8,
-        }}
-      >
-        <strong>Global chat:</strong>
-        <div
-          style={{
-            marginTop: 8,
-            maxHeight: 280,
-            overflowY: "auto",
-            paddingRight: 6,
-          }}
-        >
-          {messages.length === 0 ? (
-            <div style={{ opacity: 0.6 }}>No messages yet. Say hi 👋</div>
-          ) : (
-            messages.map((m) => (
-              <div key={m.id} style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 12, opacity: 0.7 }}>
-                  <b>{m.username}</b> ·{" "}
-                  {new Date(m.createdAt).toLocaleTimeString()}
-                </div>
-                <div>{m.body}</div>
-              </div>
-            ))
+            <button
+              className="close-side"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close sidebar"
+            >
+              ×
+            </button>
           )}
         </div>
+        <ActiveUsers users={users} meId={me?.id ?? undefined} />
+      </aside>
 
-        <div style={{ marginTop: 8 }}>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
-            rows={3}
-            style={{
-              width: "100%",
-              padding: 8,
-              borderRadius: 6,
-              border: "1px solid #ccc",
-            }}
-          />
+      <div className="main-col">
+        <header className="header-row">
           <button
-            onClick={sendMessage}
-            disabled={!connected || text.trim() === ""}
-            style={{
-              marginTop: 8,
-              padding: "8px 12px",
-              borderRadius: 6,
-              border: "1px solid #ccc",
+            className="burger"
+            onClick={() => {
+              if (isDesktop) setDesktopCollapsed((v) => !v);
+              else setSidebarOpen((v) => !v);
             }}
+            aria-label="Toggle sidebar"
           >
-            Send
+            ☰
           </button>
-        </div>
+          <h1 className="h1 brand">Muhabet</h1>
+        </header>
+
+        <main>
+          <div className="card chat">
+            <strong className="chat-header">Global chat:</strong>
+            <MessageList
+              messages={messages}
+              meId={me?.id ?? undefined}
+              onLoadOlder={loadOlder}
+              hasMoreOlder={true}
+            />
+            <ChatInput disabled={false} onSend={sendMessage} />
+          </div>
+        </main>
       </div>
+
+      {!isDesktop && <div className="backdrop" onClick={() => setSidebarOpen(false)} />}
     </div>
   );
 }

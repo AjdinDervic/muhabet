@@ -1,42 +1,272 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* ========= Base (tokens) ========= */
+:root {
+  color-scheme: dark;
+  --bg: #0e1117;
+  --panel: #131a23;
+  --border: #273244;
+  --text: #e6edf3;
+  --muted: #a6b3c2;
+  --accent: #ff6b6b;   /* warm pop */
+  --success: #22c55e;
+  --danger: #ef4444;
+
+  --radius: 12px;
+  --space-1: 8px;
+  --space-2: 12px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans",
+               "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* ========= Type & small utils ========= */
+.h1 { font-size: clamp(28px, 5vw, 54px); font-weight: 800; margin: 0; letter-spacing: .3px; }
+.sub { color: var(--muted); margin: 0 0 var(--space-3); }
+.kv { display: flex; align-items: center; gap: 8px; }
+.badge { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--success); }
+.dot.off { background: var(--danger); }
+
+/*  brand color for heading */
+.brand { color: #03bef7; letter-spacing: .5px; }
+
+/* ========= LAYOUT (desktop vs mobile) ========= */
+.grid {
+  display: grid;
+  gap: var(--space-3);
+  height: 100vh;
+  padding: var(--space-4) var(--space-3);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+/* --- Desktop mode --- */
+.grid.desktop {
+  grid-template-columns: 260px 1fr; /* refined by expanded/collapsed */
 }
 
+/* Expanded (default on desktop) */
+.grid.desktop.sidebar-expanded {
+  grid-template-columns: 260px 1fr;
+}
+.grid.desktop.sidebar-expanded .sidebar {
+  display: flex;
+}
+
+/* Collapsed (desktop) — keep mounted but zero width */
+.grid.desktop.sidebar-collapsed {
+  grid-template-columns: 0px 1fr;
+}
+.grid.desktop.sidebar-collapsed .sidebar {
+  overflow: hidden;
+  width: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Smooth transition on desktop collapse/expand */
+.grid.desktop .sidebar {
+  transition: width 200ms ease, opacity 200ms ease, padding 200ms ease, border 200ms ease;
+}
+
+/* --- Mobile/Tablet mode --- */
+.grid.mobile {
+  grid-template-columns: 1fr; /* no left column by default */
+}
+.grid.mobile .sidebar {
+  display: none; /* closed by default */
+}
+
+/* When open on mobile, show overlay */
+.grid.mobile.sidebar-open .sidebar {
+  display: block;
+  position: fixed;
+  left: 16px; right: 16px; top: 16px; bottom: 16px;
+  z-index: 20;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 28px rgba(0,0,0,.45);
+}
+.grid.mobile.sidebar-open .backdrop { display: block; }
+
+/* Backdrop for mobile overlay */
+.backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 15;
+}
+
+/* ========= Columns ========= */
+.sidebar { 
+  display: flex; 
+  flex-direction: column; 
+  padding: var(--space-3);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.sidebar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.close-side {
+  border: 0; background: #1f2937; color: var(--text);
+  padding: 4px 10px; border-radius: 8px; cursor: pointer; font-size: 18px; line-height: 1;
+}
+
+/* Right/main column: header (auto) + content (fills) */
+.main-col {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--space-3);
+  min-height: 0;                        /* allow inner scroll areas */
+}
+
+.header-row { display: flex; align-items: center; gap: 12px; }
+.burger { background: transparent; border: 0; font-size: 20px; cursor: pointer; color: var(--muted); }
+
+/* ========= Card ========= */
 .card {
-  padding: 2em;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  position: relative;                   /* host floating 'Newest' */
+  display: flex; flex-direction: column;
 }
 
-.read-the-docs {
-  color: #888;
+/* The chat card fills the main area; messages scroll inside */
+.card.chat { flex: 1; min-height: 0; }
+main { display: flex; min-height: 0; }
+
+/* ========= Active users (highlight me) ========= */
+.user { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px; }
+.user.me { background: rgba(3, 207, 248, 0.14); border: 1px solid #3a3f58; }
+.avatar { width: 22px; text-align: center; }
+.name { font-weight: 600; }
+
+/* ========= Messages ========= */
+.messages {
+  position: relative;                   /* so 'Newest' sits within */
+  margin-top: var(--space-2);
+  flex: 1;
+  min-height: 0;
+  max-height: none;                     /* grow to fill */
+  overflow-y: auto;
+  padding-right: 6px;
+  scroll-behavior: smooth;
+  border-top: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--border);
 }
+
+/* Only rendered by JS when at top or loading */
+.messages-topbar {
+  position: sticky; top: 0;
+  display: flex; justify-content: center;
+  padding: 6px 0 2px;
+  background: linear-gradient(var(--panel), rgba(0,0,0,0));
+  z-index: 2;
+}
+.btn.small { padding: 6px 10px; font-size: 12px; }
+.top-note { font-size: 12px; color: var(--muted); padding: 4px 8px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: 8px; }
+
+/* Bubbles */
+.msg { margin: 10px 0; }
+.meta { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+.bubble {
+  display: inline-block;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #161c27;
+  border: 1px solid var(--border);
+  max-width: min(720px, 96%);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.msg.mine .bubble { background: #1a2b3a; border-color: #2b4258; }
+
+/* “Newest” — centered at bottom INSIDE the messages area */
+.messages .jump-latest {
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  bottom: 12px; z-index: 3;
+  border: 1px solid var(--border);
+  background: #202a36;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(0,0,0,.35);
+}
+
+/* ========= Input with send button inside ========= */
+.input-wrap { position: relative; }
+.input {
+  width: 100%;
+  padding: 12px 44px 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #13171c;
+  color: var(--text);
+}
+.send-btn {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  border: 0; background: #03a0f4; padding: 6px 10px; border-radius: 10px; cursor: pointer;
+}
+.send-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ========= Buttons ========= */
+.btn {
+  margin-top: var(--space-2);
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #03acfb;
+  color: var(--text);
+  cursor: pointer;
+}
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.toast {
+  position: fixed; bottom: 18px; right: 18px;
+  background: #0f172a; border: 1px solid #1f2937; padding: 12px 14px; border-radius: 10px;
+  box-shadow: 0 6px 22px rgba(0,0,0,.35);
+}
+.toast.info {}
+
+/* ========= Join screen ========= */
+.page.center { display: grid; place-items: center; height: 100vh; }
+.join-card { max-width: 520px; text-align: center; }
+.btn.primary { background: #1f2937; border-color: #293241; }
+
+/*First page that say welcome*/
+.word-pro, .word-imo { color: var(--accent); }
+.word-muhabet { color: #07c0fe; }
+
+.join-btn {
+  background: #03acfb;      
+  border-color: #0512c3;
+  color: #fff;
+  font-weight: 600;
+  transition: background 0.2s ease;
+}
+.join-btn:hover {
+  background: #043aec;
+}
+
+
+.chat-header {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: #03bef7;     
+  letter-spacing: 0.5px;
+}
+
+

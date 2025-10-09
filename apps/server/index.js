@@ -5,11 +5,12 @@ const { Server } = require('socket.io');
 const {PrismaClient} = require('@prisma/client');
 //const activeUsers = new Map();
 
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 
 
 const prisma = new PrismaClient();
 const app = express();
-app.use(cors({ origin: 'http://localhost:5173'}));
+app.use(cors({ origin: FRONTEND_ORIGIN}));
 app.use(express.json());
 
 // health checker 
@@ -27,7 +28,7 @@ function makeUsername(){
 // HTTP server + Socket.IO on same port
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {origin: 'http://localhost:5173'},
+  cors: {origin: FRONTEND_ORIGIN},
 
 });
 
@@ -95,7 +96,10 @@ io.on('connection', (socket) => {
   activeUsers.set(socket.id, user);
 
  // Welcome message 
-  socket.emit('hello', { msg: `Welcome to Muhabet, ${user.username}!` });
+  socket.emit('hello', { 
+    msg: `Welcome to Muhabet, ${user.username}!`, 
+    me: user 
+  });
 // Notification that user is joined
   io.emit('user_joined', user);
 
@@ -137,16 +141,15 @@ console.log('message:send PERSISTED', row.id);
 
   
 
-  socket.on('disconnect', (reason) => {
-    console.log('SOCKET DISCONNECTED', socket.id);
-    const u = activeUsers.get(socket.id);
-    activeUsers.delete(socket.id);
-    if (u) io.emit('user_left', u);
-    
-  });
+socket.on('disconnect', () => {
+  const u = activeUsers.get(socket.id);
+  activeUsers.delete(socket.id);
+  if (u) io.emit('user_left', u);
 });
 
-const PORT = 4000;
+});
+
+const PORT = process.env.PORT || 4000;
 server.listen(PORT, ()=> {
   console.log(`API + WS listening at http://localhost:${PORT}`);
 });
