@@ -3,45 +3,40 @@ version: "3.9"
 services:
   db:
     image: postgres:16-alpine
-    container_name: muhabet_db
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+      POSTGRES_DB: muhabet
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d muhabet"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 12
+    ports:
+      - "5432:5432"         # optional for local tools
+    volumes:
+      - pgdata:/var/lib/postgresql/data
 
   server:
-    build:
-      context: ./apps/server
-    container_name: muhabet_server
+    build: ./apps/server
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/muhabet
+      FRONTEND_ORIGIN: http://localhost:5173
+      NODE_ENV: development
+      PORT: 4000
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      NODE_ENV: ${NODE_ENV}
-      PORT: ${PORT}
-      DATABASE_URL: ${DATABASE_URL}
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
     ports:
       - "4000:4000"
 
   web:
-    build:
-      context: ./apps/web
-      # If deploying to a remote domain, uncomment and set:
-      # args:
-      #   VITE_API_BASE: https://api.yourdomain
-    container_name: muhabet_web
+    build: ./apps/web
+    ports:
+      - "5173:80"
     depends_on:
       - server
-    ports:
-      - "5173:80"  # Serve the SPA on localhost:5173 for consistency
 
 volumes:
   pgdata:
